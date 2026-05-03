@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Xổ Số Neon - Trác Tuyệt Hệ</title>
+    <style>
+        :root {
+            --neon-pink: #ff00ff;
+            --neon-blue: #00ffff;
+            --neon-yellow: #ffff00;
+            --neon-red: #ff0000;
+        }
+
+        body {
+            background-color: #050505;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        /* Hiệu ứng rung màn hình */
+        .shake {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+            transform: translate3d(0, 0, 0);
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+
+        h1 {
+            color: var(--neon-blue);
+            text-shadow: 0 0 10px var(--neon-blue), 0 0 20px var(--neon-blue);
+            margin-bottom: 30px;
+            animation: flicker 3s infinite;
+        }
+
+        @keyframes flicker {
+            0%, 18%, 22%, 25%, 53%, 57%, 100% {
+                text-shadow: 0 0 10px var(--neon-blue), 0 0 20px var(--neon-blue), 0 0 40px var(--neon-blue);
+                opacity: 1;
+            }
+            20%, 24%, 55% { text-shadow: none; opacity: 0.7; }
+        }
+
+        .input-container { margin-bottom: 20px; }
+
+        input {
+            background: transparent;
+            border: 2px solid var(--neon-pink);
+            padding: 10px;
+            color: white;
+            font-size: 1.2rem;
+            text-align: center;
+            outline: none;
+            box-shadow: 0 0 10px var(--neon-pink);
+            border-radius: 5px;
+            animation: borderFlicker 4s infinite;
+        }
+
+        @keyframes borderFlicker {
+            0%, 100% { box-shadow: 0 0 10px var(--neon-pink); border-color: var(--neon-pink); }
+            50% { box-shadow: 0 0 2px var(--neon-pink); border-color: #550055; }
+        }
+
+        button {
+            background: transparent;
+            border: 2px solid var(--neon-blue);
+            color: var(--neon-blue);
+            padding: 10px 25px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            box-shadow: 0 0 10px var(--neon-blue);
+            transition: 0.3s;
+            margin-left: 10px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background: var(--neon-blue);
+            color: black;
+            box-shadow: 0 0 20px var(--neon-blue);
+        }
+
+        .slot-container { display: flex; gap: 15px; margin: 40px 0; }
+
+        .slot {
+            width: 70px;
+            height: 100px;
+            border: 3px solid var(--neon-yellow);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            font-weight: bold;
+            border-radius: 10px;
+            background: rgba(255, 255, 0, 0.05);
+            position: relative;
+            box-shadow: 0 0 5px var(--neon-yellow);
+        }
+
+        .rolling { animation: rollingFlash 0.15s infinite alternate; }
+
+        @keyframes rollingFlash {
+            from { opacity: 1; filter: brightness(2); transform: scale(1.05); }
+            to { opacity: 0.3; filter: brightness(0.5); transform: scale(1); }
+        }
+
+        .winner-pop {
+            animation: popScale 0.6s ease-out;
+            color: var(--neon-pink);
+            text-shadow: 0 0 20px var(--neon-pink), 0 0 40px var(--neon-pink);
+        }
+
+        @keyframes popScale {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.6); box-shadow: 0 0 40px var(--neon-pink); }
+            100% { transform: scale(1); }
+        }
+
+        #result-message {
+            font-size: 1.8rem;
+            height: 60px;
+            text-align: center;
+            margin-top: 20px;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(255,255,255,0.5);
+        }
+
+        #canvas { position: absolute; top: 0; left: 0; pointer-events: none; z-index: 10; }
+    </style>
+</head>
+<body id="main-body">
+
+    <h1>NEON LOTTERY</h1>
+
+    <div class="input-container">
+        <input type="text" id="user-number" placeholder="Nhập đúng 7 số..." maxlength="15">
+        <button onclick="startLottery()">QUAY SỐ</button>
+    </div>
+
+    <div class="slot-container" id="slots">
+        <div class="slot" id="slot-0">-</div>
+        <div class="slot" id="slot-1">-</div>
+        <div class="slot" id="slot-2">-</div>
+        <div class="slot" id="slot-3">-</div>
+        <div class="slot" id="slot-4">-</div>
+        <div class="slot" id="slot-5">-</div>
+        <div class="slot" id="slot-6">-</div>
+    </div>
+
+    <div id="result-message"></div>
+
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSound(freq, type, duration, vol = 0.1) {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        }
+
+        const PRIZES = {
+            1: { msg: "Chúc mừng bạn đạt giải khuyến khích", cash: "50$", power: 2 },
+            2: { msg: "Chúc mừng bạn đạt giải sáu", cash: "100$", power: 4 },
+            3: { msg: "Chúc mừng bạn đạt giải năm", cash: "1500$", power: 7 },
+            4: { msg: "Chúc mừng bạn đạt giải bốn", cash: "2000$", power: 10 },
+            5: { msg: "Chúc mừng bạn đạt giải ba", cash: "25000$", power: 15 },
+            6: { msg: "Chúc mừng bạn đạt giải nhì", cash: "50000$", power: 25 },
+            7: { msg: "Chúc mừng bạn trúng độc đắc", cash: "1000000$", power: 50 }
+        };
+
+        async function startLottery() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            
+            const input = document.getElementById('user-number').value;
+            const msgBox = document.getElementById('result-message');
+            const body = document.getElementById('main-body');
+
+            // Kiểm tra điều kiện 7 chữ số
+            if (input.length !== 7 || isNaN(input)) {
+                // Rung màn hình
+                body.classList.add('shake');
+                setTimeout(() => body.classList.remove('shake'), 500);
+
+                // Âm thanh lỗi (tiếng xẹt xẹt đục)
+                playSound(100, 'sawtooth', 0.1, 0.3);
+                playSound(60, 'sawtooth', 0.2, 0.2);
+
+                // Thông báo lỗi
+                msgBox.innerHTML = "<span style='color:var(--neon-red); text-shadow: 0 0 10px var(--neon-red)'>Không hợp lệ!</span>";
+                return;
+            }
+
+            msgBox.innerHTML = "";
+            let matchCount = 0;
+
+            for (let i = 0; i < 7; i++) {
+                const slot = document.getElementById(`slot-${i}`);
+                slot.classList.remove('winner-pop');
+                slot.style.color = "white";
+                slot.innerHTML = "?";
+                
+                slot.classList.add('rolling');
+                const rollInterval = setInterval(() => playSound(200 + Math.random() * 100, 'square', 0.05, 0.02), 100);
+                
+                await new Promise(r => setTimeout(r, 800)); 
+                clearInterval(rollInterval);
+                
+                const randDigit = Math.floor(Math.random() * 10);
+                slot.innerHTML = randDigit;
+                slot.classList.remove('rolling');
+                slot.classList.add('winner-pop');
+
+                if (randDigit === parseInt(input[i])) {
+                    matchCount++;
+                    slot.style.color = "var(--neon-yellow)";
+                    playSound(880, 'sine', 0.4, 0.2);
+                } else {
+                    playSound(150, 'sawtooth', 0.2, 0.1);
+                }
+                await new Promise(r => setTimeout(r, 300));
+            }
+
+            if (matchCount > 0) {
+                const prize = PRIZES[matchCount];
+                msgBox.innerHTML = `<span style="color:var(--neon-yellow); animation: flicker 1s infinite;">${prize.msg}<br>${prize.cash}</span>`;
+                [440, 554, 659, 880].forEach((f, idx) => {
+                    setTimeout(() => playSound(f, 'triangle', 0.6, 0.1), idx * 100);
+                });
+                launchFireworks(prize.power);
+            } else {
+                msgBox.innerHTML = "<span style='opacity:0.8'>Chúc bạn may mắn lần sau nhé!</span>";
+                playSound(100, 'sawtooth', 0.5, 0.2);
+            }
+        }
+
+        // --- Hệ thống Pháo hoa ---
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        function launchFireworks(intensity) {
+            const particles = [];
+            const colors = ["#ff00ff", "#00ffff", "#ffff00", "#ffffff", "#00ff00"];
+            for (let i = 0; i < intensity * 30; i++) {
+                particles.push({
+                    x: canvas.width / 2,
+                    y: canvas.height / 2,
+                    vx: (Math.random() - 0.5) * (intensity * 0.8),
+                    vy: (Math.random() - 0.5) * (intensity * 0.8),
+                    c: colors[Math.floor(Math.random() * colors.length)],
+                    life: 100 + Math.random() * 50,
+                    size: Math.random() * 4 + 1
+                });
+            }
+            function animate() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                particles.forEach((p, index) => {
+                    p.x += p.vx; p.y += p.vy; p.vy += 0.05; p.life -= 1;
+                    ctx.fillStyle = p.c; ctx.shadowBlur = 10; ctx.shadowColor = p.c;
+                    ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
+                    if (p.life <= 0) particles.splice(index, 1);
+                });
+                if (particles.length > 0) requestAnimationFrame(animate);
+            }
+            animate();
+        }
+
+        window.onresize = () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        };
+    </script>
+</body>
+</html>
